@@ -45,15 +45,13 @@ public class MySQLDatabase extends AbstractJdbcDatabase {
         if (objectType.equals(PrimaryKey.class) && "PRIMARY".equals(name)) {
             return null;
         } else {
-            name = super.correctObjectName(name, objectType);
-            if (name == null) {
-                return null;
-            }
-            if (!this.isCaseSensitive()) {
-                return name.toLowerCase(Locale.US);
-            }
-            return name;
+            return super.correctObjectName(name, objectType);
         }
+    }
+
+    @Override
+    public boolean isCaseSensitive() {
+        return false;
     }
 
     @Override
