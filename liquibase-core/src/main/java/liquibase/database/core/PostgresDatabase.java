@@ -1,6 +1,7 @@
 package liquibase.database.core;
 
 import liquibase.CatalogAndSchema;
+import liquibase.GlobalConfiguration;
 import liquibase.Scope;
 import liquibase.changelog.column.LiquibaseColumn;
 import liquibase.database.AbstractJdbcDatabase;
@@ -15,7 +16,7 @@ import liquibase.statement.core.RawCallStatement;
 import liquibase.statement.core.RawSqlStatement;
 import liquibase.structure.DatabaseObject;
 import liquibase.structure.core.Table;
-import liquibase.util.JdbcUtils;
+import liquibase.util.JdbcUtil;
 import liquibase.util.StringUtil;
 
 import java.math.BigInteger;
@@ -40,19 +41,9 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
      */
     static final int PGSQL_PK_BYTES_LIMIT = 63;
     static final String PGSQL_PK_SUFFIX = "_pkey";
-    static final Charset CHARSET = Scope.getCurrentScope().getFileEncoding();
 
     private static final int PGSQL_DEFAULT_TCP_PORT_NUMBER = 5432;
     private static final Logger LOG = Scope.getCurrentScope().getLog(PostgresDatabase.class);
-
-    /**
-     * Represents Postgres DB types.
-     * Note: As we know COMMUNITY, RDS and AWS AURORA have the same Postgres engine. We use just COMMUNITY for those 3
-     *       If we need we can extend this ENUM in future
-     */
-    public enum DbTypes {
-        EDB, COMMUNITY, RDS, AURORA
-    }
 
     private Set<String> systemTablesAndViews = new HashSet<>();
 
@@ -75,7 +66,7 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
                 "UNIQUE", "USER", "USING", "VARIADIC", "VERBOSE", "WHEN", "WHERE", "WINDOW", "WITH"));
         super.sequenceNextValueFunction = "nextval('%s')";
         super.sequenceCurrentValueFunction = "currval('%s')";
-        super.unmodifiableDataTypes.addAll(Arrays.asList("bool", "int4", "int8", "float4", "float8", "bigserial", "serial", "oid", "bytea", "date", "timestamptz", "text", "int2[]", "int4[]", "int8[]", "float4[]", "float8[]", "bool[]", "varchar[]", "text[]"));
+        super.unmodifiableDataTypes.addAll(Arrays.asList("bool", "int4", "int8", "float4", "float8", "bigserial", "serial", "oid", "bytea", "date", "timestamptz", "text", "int2[]", "int4[]", "int8[]", "float4[]", "float8[]", "bool[]", "varchar[]", "text[]", "numeric[]"));
         super.unquotedObjectsAreUppercased=false;
     }
 
@@ -136,8 +127,7 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
                 String.format(
                     "Your PostgreSQL software version (%d.%d) seems to indicate that your software is " +
                         "older than %d.%d. This means that you might encounter strange behaviour and " +
-                        "incorrect error messages.",
-                    majorVersion, minorVersion, majorVersion, minorVersion));
+                        "incorrect error messages.", majorVersion, minorVersion, MINIMUM_DBMS_MAJOR_VERSION, MINIMUM_DBMS_MINOR_VERSION));
             return true;
         }
 
@@ -195,7 +185,7 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
             } catch (SQLException | DatabaseException e) {
                 LOG.info("Cannot check pg_settings", e);
             } finally {
-                JdbcUtils.close(resultSet, statement);
+                JdbcUtil.close(resultSet, statement);
             }
         }
 
@@ -350,8 +340,10 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
      */
     @Override
     public String generatePrimaryKeyName(final String tableName) {
-        final byte[] tableNameBytes = tableName.getBytes(CHARSET);
-        final int pkNameBaseAllowedBytesCount = PGSQL_PK_BYTES_LIMIT - PGSQL_PK_SUFFIX.getBytes(CHARSET).length;
+        final Charset charset = GlobalConfiguration.FILE_ENCODING.getCurrentValue();
+
+        final byte[] tableNameBytes = tableName.getBytes(charset);
+        final int pkNameBaseAllowedBytesCount = PGSQL_PK_BYTES_LIMIT - PGSQL_PK_SUFFIX.getBytes(charset).length;
 
         if (tableNameBytes.length <= pkNameBaseAllowedBytesCount) {
             return tableName + PGSQL_PK_SUFFIX;
@@ -359,7 +351,7 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
 
         // As symbols could be encoded with more than 1 byte, the last symbol bytes couldn't be identified precisely.
         // To avoid the last symbol being the invalid one, just truncate it.
-        final String baseName = new String(tableNameBytes, 0, pkNameBaseAllowedBytesCount, CHARSET);
+        final String baseName = new String(tableNameBytes, 0, pkNameBaseAllowedBytesCount, charset);
         return baseName.substring(0, baseName.length() - 1) + PGSQL_PK_SUFFIX;
     }
 
@@ -414,28 +406,4 @@ public class PostgresDatabase extends AbstractJdbcDatabase {
 
         throw new DatabaseException("Connection set to Postgres type we don't support !");
     }
-
-    @Override
-    public void rollback() throws DatabaseException {
-        super.rollback();
-        DatabaseUtils.initializeDatabase(getDefaultCatalogName(), getDefaultSchemaName(), this);
-    }
-
-    /**
-     * Method to get Postgres DB type
-     * @return Db types
-     * */
-    public DbTypes getDbType() {
-        boolean enterpriseDb = false;
-        try {
-            enterpriseDb = getDatabaseFullVersion().toLowerCase().contains("enterprisedb");
-        } catch (DatabaseException e) {
-            if (getConnection() != null) {
-                Scope.getCurrentScope().getLog(getClass()).severe("Can't get full version of Postgres DB. Used EDB as default", e);
-                return DbTypes.EDB;
-            }
-        }
-        return enterpriseDb ? DbTypes.EDB : DbTypes.COMMUNITY;
-    }
-
 }

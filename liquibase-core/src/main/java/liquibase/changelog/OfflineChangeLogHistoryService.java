@@ -28,6 +28,7 @@ import java.util.Date;
 import java.util.List;
 
 @LiquibaseService(skip = true)
+@SuppressWarnings("java:S899")
 public class OfflineChangeLogHistoryService extends AbstractChangeLogHistoryService {
 
     private final File changeLogFile;
@@ -254,7 +255,7 @@ public class OfflineChangeLogHistoryService extends AbstractChangeLogHistoryServ
             newLine[Columns.DESCRIPTION.ordinal()] = changeSet.getDescription();
             newLine[Columns.COMMENTS.ordinal()] = changeSet.getComments();
             newLine[Columns.TAG.ordinal()] = "";
-            newLine[Columns.LIQUIBASE.ordinal()] = LiquibaseUtil.getBuildVersion().replaceAll("SNAPSHOT", "SNP");
+            newLine[Columns.LIQUIBASE.ordinal()] = LiquibaseUtil.getBuildVersion();
 
             newLine[Columns.CONTEXTS.ordinal()] = (changeSet.getContexts() == null) ? null : changeSet.getContexts().toString();
             newLine[Columns.LABELS.ordinal()] = (changeSet.getLabels() == null) ? null : changeSet.getLabels().toString();

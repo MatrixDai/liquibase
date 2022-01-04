@@ -11,6 +11,7 @@ import liquibase.statement.DatabaseFunction;
 import liquibase.util.StringUtil;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 @DataTypeInfo(name = "boolean", aliases = {"java.sql.Types.BOOLEAN", "java.lang.Boolean", "bit", "bool"}, minParameters = 0, maxParameters = 0, priority = LiquibaseDataType.PRIORITY_DEFAULT)
 public class BooleanType extends LiquibaseDataType {
@@ -41,7 +42,7 @@ public class BooleanType extends LiquibaseDataType {
             } else {
                 return new DatabaseDataType("SMALLINT");
             }
-        } else if (database.getClass().isAssignableFrom(DB2Database.class)) {
+        } else if (database instanceof DB2Database) {
 			if (((DB2Database) database).supportsBooleanDataType())
 				return new DatabaseDataType("BOOLEAN");
 			else
@@ -71,6 +72,13 @@ public class BooleanType extends LiquibaseDataType {
             } else if ("false".equals(((String) value).toLowerCase(Locale.US)) || "0".equals(value) || "b'0'".equals(
                     ((String) value).toLowerCase(Locale.US)) || "f".equals(((String) value).toLowerCase(Locale.US)) || ((String) value).toLowerCase(Locale.US).equals(this.getFalseBooleanValue(database).toLowerCase(Locale.US))) {
                 returnValue = this.getFalseBooleanValue(database);
+            } else if (database instanceof PostgresDatabase && Pattern.matches("b?([01])\\1*(::bit|::\"bit\")?", (String) value)) {
+                returnValue = "b'" 
+                        + value.toString()
+                                .replace("b", "")
+                                .replace("\"", "")
+                                .replace("::it", "")
+                        + "'::\"bit\"";
             } else {
                 throw new UnexpectedLiquibaseException("Unknown boolean value: " + value);
             }
@@ -102,12 +110,15 @@ public class BooleanType extends LiquibaseDataType {
     }
 
     protected boolean isNumericBoolean(Database database) {
+        if (database instanceof Firebird3Database) {
+            return false;
+        }
         if (database instanceof DerbyDatabase) {
             return !((DerbyDatabase) database).supportsBooleanDataType();
-        } else if (database.getClass().isAssignableFrom(DB2Database.class)) {
+        } else if (database instanceof DB2Database) {
 			return !((DB2Database) database).supportsBooleanDataType();
     	}
-        return (database instanceof Db2zDatabase) || (database instanceof DB2Database) || (database instanceof FirebirdDatabase) || (database instanceof
+        return (database instanceof Db2zDatabase) || (database instanceof FirebirdDatabase) || (database instanceof
             MSSQLDatabase) || (database instanceof MySQLDatabase) || (database instanceof OracleDatabase) ||
             (database instanceof SQLiteDatabase) || (database instanceof SybaseASADatabase) || (database instanceof
             SybaseDatabase);
