@@ -33,6 +33,7 @@ public class GlobalConfiguration implements AutoloadedConfigurations {
     public static final ConfigurationDefinition<Boolean> HEADLESS;
     public static final ConfigurationDefinition<Boolean> STRICT;
     public static final ConfigurationDefinition<Integer> DDL_LOCK_TIMEOUT;
+    public static final ConfigurationDefinition<Boolean> DIFF_COLUMN_DEFAULT_VALUE_CONSTRAINT_NAME;
 
     static {
         ConfigurationDefinition.Builder builder = new ConfigurationDefinition.Builder("liquibase");
@@ -174,6 +175,11 @@ public class GlobalConfiguration implements AutoloadedConfigurations {
                 .addAliasKey("ddl_lock_timeout")
                 .addAliasKey("liquibase.ddl_lock_timeout")
                 .setDescription("The DDL_LOCK_TIMEOUT parameter indicates the number of seconds a DDL command should wait for the locks to become available before throwing the resource busy error message. This applies only to Oracle databases.")
+                .build();
+
+        DIFF_COLUMN_DEFAULT_VALUE_CONSTRAINT_NAME = builder.define("diffColumnDefaultValueConstraintName", Boolean.class)
+                .setDescription("Should Liquibase compare column default value constraint name in diff operation?")
+                .setDefaultValue(true)
                 .build();
     }
 }
